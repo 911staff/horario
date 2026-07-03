@@ -72,6 +72,8 @@
   .emprow .epin{font-size:11px;color:var(--muted);}
   .smallbtn{padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:#232325;color:var(--muted);cursor:pointer;font-size:10.5px;}
   .smallbtn:hover{color:var(--ink);border-color:var(--accent);}
+  .smallbtn.danger{border-color:#e5544b;color:#e5544b;}
+  .smallbtn.danger:hover{background:rgba(229,84,75,0.12);}
   .btn-primary{background:var(--accent);border:1px solid var(--accent);color:var(--accent-ink);font-weight:700;}
   .errmsg{color:#e5544b;font-size:11px;margin:-4px 0 8px;min-height:14px;}
 </style>
@@ -360,17 +362,54 @@ async function refreshEmployeeList(){
     const row = document.createElement('div');
     row.className = 'emprow';
     row.style.opacity = emp.active ? '1' : '0.5';
+    row.style.flexWrap = 'wrap';
     row.innerHTML = `
       <span class="ename">${emp.full_name}<br><span style="color:var(--muted);font-size:10px;">${emp.dni || 'sin DNI'}</span></span>
       <span class="epin">${emp.pin}</span>
+      <button class="smallbtn editBtn">Editar</button>
       <button class="smallbtn">${emp.active ? 'Desactivar' : 'Activar'}</button>
+      <button class="smallbtn danger delBtn">Eliminar</button>
     `;
-    row.querySelector('button').onclick = async ()=>{
+    const [editBtn, toggleBtn, delBtn] = row.querySelectorAll('button');
+    toggleBtn.onclick = async ()=>{
       await sb.from('employees').update({active: !emp.active}).eq('id', emp.id);
       refreshEmployeeList();
     };
+    delBtn.onclick = async ()=>{
+      if(!confirm(`¿Eliminar a ${emp.full_name} (PIN ${emp.pin}) y todo su horario guardado? No se puede deshacer.`)) return;
+      const { error: delErr } = await sb.from('employees').delete().eq('id', emp.id);
+      if(delErr){ alert('Error al eliminar: ' + delErr.message); return; }
+      refreshEmployeeList();
+    };
+    editBtn.onclick = ()=> openEditRow(row, emp);
     wrap.appendChild(row);
   });
+}
+
+function openEditRow(row, emp){
+  row.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:6px;width:100%;">
+      <input type="text" class="editName" value="${emp.full_name.replace(/"/g,'&quot;')}" placeholder="Nombre completo">
+      <input type="text" class="editDni" value="${(emp.dni||'').replace(/"/g,'&quot;')}" placeholder="DNI / Pasaporte">
+      <div class="errmsg editErr">&nbsp;</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="smallbtn cancelEditBtn">Cancelar</button>
+        <button class="smallbtn btn-primary saveEditBtn">Guardar</button>
+      </div>
+    </div>
+  `;
+  row.querySelector('.cancelEditBtn').onclick = ()=> refreshEmployeeList();
+  row.querySelector('.saveEditBtn').onclick = async ()=>{
+    const newName = row.querySelector('.editName').value.trim();
+    const newDni = row.querySelector('.editDni').value.trim();
+    const errEl = row.querySelector('.editErr');
+    if(!newName){ errEl.textContent = 'El nombre no puede quedar vacío.'; return; }
+    if(!newDni){ errEl.textContent = 'El DNI no puede quedar vacío.'; return; }
+    if(!confirm(`¿Guardar estos datos para ${emp.full_name} (PIN ${emp.pin})?\n\nNombre: ${newName}\nDNI: ${newDni}`)) return;
+    const { error } = await sb.from('employees').update({ full_name: newName, dni: newDni }).eq('id', emp.id);
+    if(error){ errEl.textContent = 'Error: ' + error.message; return; }
+    refreshEmployeeList();
+  };
 }
 
 async function addEmployee(){
