@@ -136,6 +136,7 @@
     <div id="empList"></div>
     <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
       <input type="text" id="newEmpName" placeholder="Nombre completo">
+      <input type="text" id="newEmpDni" placeholder="DNI / Pasaporte">
       <input type="text" id="newEmpPin" placeholder="Código de 4 dígitos" maxlength="4" inputmode="numeric">
       <div class="errmsg" id="newEmpErr">&nbsp;</div>
       <button class="smallbtn btn-primary" onclick="addEmployee()">+ Añadir empleado</button>
@@ -351,7 +352,7 @@ function closeAdminPanel(){ document.getElementById('adminPanel').classList.add(
 async function refreshEmployeeList(){
   const wrap = document.getElementById('empList');
   wrap.innerHTML = '<div style="color:var(--muted);font-size:11.5px;">Cargando...</div>';
-  const { data, error } = await sb.from('employees').select('id,full_name,pin,active').order('full_name');
+  const { data, error } = await sb.from('employees').select('id,full_name,dni,pin,active').order('full_name');
   if(error){ wrap.innerHTML = '<div style="color:#e5544b;font-size:11.5px;">Error al cargar: '+error.message+'</div>'; return; }
   wrap.innerHTML = '';
   if(!data || data.length===0){ wrap.innerHTML = '<div style="color:var(--muted);font-size:11.5px;">Aún no hay empleados.</div>'; return; }
@@ -360,7 +361,7 @@ async function refreshEmployeeList(){
     row.className = 'emprow';
     row.style.opacity = emp.active ? '1' : '0.5';
     row.innerHTML = `
-      <span class="ename">${emp.full_name}</span>
+      <span class="ename">${emp.full_name}<br><span style="color:var(--muted);font-size:10px;">${emp.dni || 'sin DNI'}</span></span>
       <span class="epin">${emp.pin}</span>
       <button class="smallbtn">${emp.active ? 'Desactivar' : 'Activar'}</button>
     `;
@@ -374,18 +375,21 @@ async function refreshEmployeeList(){
 
 async function addEmployee(){
   const name = document.getElementById('newEmpName').value.trim();
+  const dni = document.getElementById('newEmpDni').value.trim();
   const pin = document.getElementById('newEmpPin').value.trim();
   const errEl = document.getElementById('newEmpErr');
   errEl.textContent = '\u00a0';
   if(!name){ errEl.textContent = 'Escribe el nombre completo.'; return; }
+  if(!dni){ errEl.textContent = 'Escribe el DNI o pasaporte.'; return; }
   if(!/^[0-9]{4}$/.test(pin)){ errEl.textContent = 'El código debe ser de 4 dígitos numéricos.'; return; }
-  const { error } = await sb.from('employees').insert({ full_name: name, pin });
+  const { error } = await sb.from('employees').insert({ full_name: name, dni, pin });
   if(error){
     if(error.code === '23505'){ errEl.textContent = 'Ese código ya lo usa otro empleado, prueba con otro.'; }
     else { errEl.textContent = 'Error: ' + error.message; }
     return;
   }
   document.getElementById('newEmpName').value = '';
+  document.getElementById('newEmpDni').value = '';
   document.getElementById('newEmpPin').value = '';
   refreshEmployeeList();
 }
